@@ -69,13 +69,15 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
             // if (imageUrl != null) MainColorExtractor(imageUrl: imageUrl ?? ''),
 
             const SizedBox(height: 30),
+
             // if (kDebugMode)Text(uniModel.clipboard ?? '', style: TextStyle(color: Colors.white),),
-            if (uniModel.track?.previewUrl != null)
+            if (imageUrl != null)
               buildFaboulesLyrics(imageUrl, width, uniModel, _controller),
 
             // buildMainSearch(),
 
-            if (uniModel.track?.previewUrl == null) ...[
+            // On init
+            if (imageUrl == null) ...[
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: width * 0.05),
                 child: ClipRRect(
@@ -108,8 +110,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                   ),
                   onPressed: () async {
                     await getSong();
-                    print('START: _controller()');
-                    getLyrics(_controller);
+                    getLyrics(_controller.text);
                   },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -224,18 +225,23 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                     ),
                     onPressed: () async {
                       await getSong();
-                      print('START: _controller()');
-                      getLyrics(_controller);
+                      getLyrics(_controller.text);
                     },
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.downloading,
-                      color: Colors.white,
-                      size: 36,
-                    ),
-                    onPressed: () async => getLyrics(_controller),
-                  ),
+                  InkWell(
+                      child: Icon(
+                        Icons.downloading,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                      onTap: () async => getLyrics(_controller.text),
+                      onLongPress: () {
+                        // Extract track name and remove everything after "-" or "("
+                        final txt = (uniModel.track?.name.toString() ?? '');
+                        final cleanedTxt =
+                            txt.split(RegExp(r'\s*[-(].*')).first.trim();
+                        getLyrics(cleanedTxt);
+                      }),
                 ],
               ),
             ),
@@ -245,15 +251,18 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     );
   }
 
-  Future getLyrics(_controller) async {
+  Future getLyrics(String query) async {
     lyrics = [];
     translatedLines = [];
+    _selectedLineIndices = Set();
     setState(() {});
 
-    final songPath = await LyricsServices.getSongPath(_controller.text);
+    final songPath = await LyricsServices.getSongPath(q: query);
     print('songPath: ${songPath}');
-    lyrics = await LyricsServices.fetchLyrics(songPath);
-    translatedLines = await LyricsServices.translatedLyrics(lyrics);
+    lyrics = await LyricsServices.fetchLyrics(songPath)
+        .then((result) => LyricsServices.cleanLyrics(result));
+    translatedLines = await LyricsServices.translatedLyrics(lyrics)
+        .then((result) => LyricsServices.cleanLyrics(result));
 
     setState(() {});
   }
@@ -261,12 +270,13 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
   Future getSong() async {
     lyrics = [];
     translatedLines = [];
+    _selectedLineIndices = Set();
     setState(() {});
 
     await context.read<UniModel>().setTrackFromClipboard();
 
     final imageUrl = context.read<UniModel>().track?.album?.images?[1].url;
-    print('imageUrl: ${imageUrl}');
+
     final PaletteGenerator paletteGenerator =
         await PaletteGenerator.fromImageProvider(
       NetworkImage(imageUrl ?? ''),
@@ -308,6 +318,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
               // color: darkVibrantColor,
               // color: darkMutedColor,
               child: ListTile(
+                splashColor: Colors.transparent,
                 title: Text(
                   lyrics[index],
                   style: const TextStyle(color: Colors.white),
@@ -350,64 +361,64 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     );
   }
 
-  Card buildMainSearch() {
-    final _controller = context.read<UniModel>().controller;
-
-    return Card(
-      color: Colors.white.withOpacity(0.2),
-      child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              IconButton(
-                  icon: Icon(Icons.music_note, color: Colors.white),
-                  onPressed: () async {
-                    await context.read<UniModel>().setTrackFromClipboard();
-
-                    final imageUrl =
-                        context.read<UniModel>().track?.album?.images?[1].url;
-                    print('imageUrl: ${imageUrl}');
-                    final PaletteGenerator paletteGenerator =
-                        await PaletteGenerator.fromImageProvider(
-                      NetworkImage(imageUrl ?? ''),
-                    );
-                    dominantColor = paletteGenerator.dominantColor?.color ??
-                        Colors.transparent;
-                    darkMutedColor = paletteGenerator.darkMutedColor?.color ??
-                        Colors.transparent;
-
-                    vibrantColor = paletteGenerator.vibrantColor?.color ??
-                        Colors.transparent;
-
-                    setState(() {});
-                  }),
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  style: TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    hintText: 'Song name + Artist',
-                    hintStyle: TextStyle(color: Colors.white54),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.send, color: Colors.white),
-                onPressed: () async {
-                  final songPath =
-                      await LyricsServices.getSongPath(_controller.text);
-                  lyrics = await LyricsServices.fetchLyrics(songPath);
-                  translatedLines =
-                      await LyricsServices.translatedLyrics(lyrics);
-
-                  setState(() {});
-                },
-              ),
-            ],
-          )),
-    );
-  }
+  // Card _buildMainSearch() {
+  //   final _controller = context.read<UniModel>().controller;
+  //
+  //   return Card(
+  //     color: Colors.white.withOpacity(0.2),
+  //     child: Padding(
+  //         padding: const EdgeInsets.all(8.0),
+  //         child: Row(
+  //           children: [
+  //             IconButton(
+  //                 icon: Icon(Icons.music_note, color: Colors.white),
+  //                 onPressed: () async {
+  //                   await context.read<UniModel>().setTrackFromClipboard();
+  //
+  //                   final imageUrl =
+  //                       context.read<UniModel>().track?.album?.images?[1].url;
+  //                   print('X imageUrl: ${imageUrl}');
+  //                   final PaletteGenerator paletteGenerator =
+  //                       await PaletteGenerator.fromImageProvider(
+  //                     NetworkImage(imageUrl ?? ''),
+  //                   );
+  //                   dominantColor = paletteGenerator.dominantColor?.color ??
+  //                       Colors.transparent;
+  //                   darkMutedColor = paletteGenerator.darkMutedColor?.color ??
+  //                       Colors.transparent;
+  //
+  //                   vibrantColor = paletteGenerator.vibrantColor?.color ??
+  //                       Colors.transparent;
+  //
+  //                   setState(() {});
+  //                 }),
+  //             Expanded(
+  //               child: TextField(
+  //                 controller: _controller,
+  //                 style: TextStyle(color: Colors.white),
+  //                 decoration: const InputDecoration(
+  //                   hintText: 'Song name + Artist',
+  //                   hintStyle: TextStyle(color: Colors.white54),
+  //                   border: InputBorder.none,
+  //                 ),
+  //               ),
+  //             ),
+  //             IconButton(
+  //               icon: Icon(Icons.send, color: Colors.white),
+  //               onPressed: () async {
+  //                 final songPath =
+  //                     await LyricsServices.getSongPath(_controller.text);
+  //                 lyrics = await LyricsServices.fetchLyrics(songPath);
+  //                 translatedLines =
+  //                     await LyricsServices.translatedLyrics(lyrics);
+  //
+  //                 setState(() {});
+  //               },
+  //             ),
+  //           ],
+  //         )),
+  //   );
+  // }
 
   AppBar buildAppBar() {
     return AppBar(

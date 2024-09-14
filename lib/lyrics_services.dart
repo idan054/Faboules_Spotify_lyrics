@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:translator/translator.dart';
 
 class LyricsServices {
-  static Future<String?> getSongPath(String q) async {
+  static Future<String?> getSongPath({required String q}) async {
     var headers = {
       'Authorization':
           'Bearer mBuPnQfgbuL5wjCojlIcfdV0Xw7krPPTg5oU0Fe5nUeunELizov3e9jkYSUydbtI',
@@ -46,15 +46,20 @@ class LyricsServices {
     ));
 
     if (lyricsResponse.statusCode == 200) {
+      print('songPath: ${songPath}');
       final document = htmlParser.parse(lyricsResponse.body);
 
-      final lyricsDiv =
-          document.querySelector('[data-lyrics-container="true"]');
+      // final lyricsDiv = document.querySelector('[data-lyrics-container="true"]');
 
-      final lyricsHtml = lyricsDiv?.innerHtml ?? '';
+      final lyricsDivs =
+          document.querySelectorAll('[data-lyrics-container="true"]');
+
+      // Collect all lyrics from each div
+      final allLyricsHtml =
+          lyricsDivs.map((div) => div.innerHtml ?? '').join('\n');
 
       // Extract lines while preserving line breaks
-      final linesHtml = lyricsHtml
+      final linesHtml = allLyricsHtml
           .replaceAll(
               RegExp(r'<br\s*/?>'), '\n') // Convert <br> tags to newlines
           .replaceAll(RegExp(r'<.*?>'), '') // Remove HTML tags
@@ -63,8 +68,9 @@ class LyricsServices {
           .where((line) => line.trim().isNotEmpty) // Remove empty lines
           .toList();
 
-      final cleanLyrics = _cleanLyrics(linesHtml);
-      return cleanLyrics;
+      // final cleanLyrics = _cleanLyrics(linesHtml);
+      // return cleanLyrics;
+      return linesHtml;
     }
     return [];
   }
@@ -86,22 +92,24 @@ class LyricsServices {
       // Split the translated text back into lines
       List<String> translatedLinesUnfiltered = translation.text.split('\n');
 
-      // Reconstruct the translated lines list to match the original lyrics structure
       int lineIndex = 0;
       for (String line in lyrics) {
+        String translatedLine = '';
+
         if (line.trim().isEmpty) {
-          // If the original line was empty, add an empty string to keep the sync
-          translatedLines.add('');
+          // If the original line was empty, use empty string to keep the sync
         } else {
           // Otherwise, add the translated line
           if (lineIndex < translatedLinesUnfiltered.length) {
-            translatedLines.add(translatedLinesUnfiltered[lineIndex]);
+            translatedLine = translatedLinesUnfiltered[lineIndex];
             lineIndex++;
           } else {
             // In case of missing lines in the translation result
-            translatedLines.add('');
+            translatedLine = 'XXX';
           }
         }
+        // print('translatedLine: ${translatedLine}');
+        translatedLines.add(translatedLine);
       }
     } catch (e) {
       print('Translation error: $e');
@@ -111,41 +119,31 @@ class LyricsServices {
     return translatedLines;
   }
 
-  static List<String> _cleanLyrics(List<String> lines) {
-    // Function to replace lines with brackets
-    String _replaceBrackets(String line) {
-      final regex = RegExp(r'\[.*?\]');
-      return line.replaceAll(regex, '\n');
-    }
+  static List<String> cleanLyrics(List<String> lines) {
+    // Function to remove bracketed content
+    // String _removeBrackets(String line) {
+    //   final regex = RegExp(r'\[.*?\]');
+    //   return line.replaceAll(regex, '').trim(); // Remove brackets and trim
+    // }
 
-    // Remove empty items at the start
+    // Replace any item containing [ or ] with an empty string
+    List<String> cleanedLines =
+        lines.map((line) => line.contains('[') ? '·' : line).toList();
+    print('cleanedLines: ${cleanedLines.length}');
+    print('lines: ${lines.length}');
+
+    // Remove empty items at the beginning
+
+    // Remove '·' items at the beginning of the list
     int startIndex = 0;
-    while (startIndex < lines.length && lines[startIndex].trim().isEmpty) {
+    while (startIndex < cleanedLines.length &&
+        (cleanedLines[startIndex].trim().isEmpty ||
+            cleanedLines[startIndex] == '·')) {
       startIndex++;
     }
 
-    // Remove empty items at the end
-    int endIndex = lines.length - 1;
-    while (endIndex >= startIndex && lines[endIndex].trim().isEmpty) {
-      endIndex--;
-    }
-
-    // Extract the cleaned list
-    List<String> cleanedLines = lines.sublist(startIndex, endIndex + 1);
-
-    // Replace lines with brackets and remove consecutive empty lines
-    List<String> finalLines = [];
-    String? previousLine;
-    for (var line in cleanedLines) {
-      line = _replaceBrackets(line);
-      if (line.trim().isEmpty && previousLine?.trim().isEmpty == true) {
-        continue; // Skip adding this line if it's an empty line after another empty line
-      }
-
-      finalLines.add(line);
-      previousLine = line;
-    }
-
-    return finalLines;
+    // Extract the cleaned list after removing empty items at the start
+    return cleanedLines.sublist(startIndex);
+    // return cleanedLines;
   }
 }
