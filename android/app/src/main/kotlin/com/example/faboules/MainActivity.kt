@@ -1,4 +1,4 @@
-package com.biton.faboules
+package com.biton.faboulesx
 
 import io.flutter.embedding.android.FlutterActivity
 
