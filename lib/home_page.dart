@@ -128,6 +128,17 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                     ],
                   ),
                 ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'קבלו תרגום לכל שיר, פשוט'
+                  '\n'
+                  'העתיקו את הקישור מ Spotify והפעילו',
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                ),
               )
             ],
 
