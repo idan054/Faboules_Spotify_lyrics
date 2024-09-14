@@ -20,11 +20,22 @@ dependencies:
   palette_generator: ^0.3.3+4
   url_launcher: ^6.3.0
   entry: ^1.0.0
+#  flutter_launcher_icons:
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+
+# flutter pub run flutter_launcher_icons:main
+# "WARNING: Icons with alpha channel are not allowed in the Apple App Store.
+# Set "remove_alpha_ios: true" to remove it."
+flutter_icons:
+  android: "launcher_icon"
+  remove_alpha_ios: true
+  ios: true
+  image_path: "assets/logo_ios.png"
+
 
 flutter:
   uses-material-design: true
