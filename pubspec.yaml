@@ -1,7 +1,7 @@
 name: faboules
 description: "A new Flutter project."
 publish_to: 'none'
-version: 3.0.0+3
+version: 4.0.0+4
 
 environment:
   sdk: '>=3.4.1 <4.0.0'
@@ -21,6 +21,12 @@ dependencies:
   url_launcher: ^6.3.0
   entry: ^1.0.0
   flutter_launcher_icons:
+  carousel_slider: ^5.0.0
+  circle_flags: ^5.0.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  collection: ^1.18.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

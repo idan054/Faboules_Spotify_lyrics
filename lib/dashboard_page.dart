@@ -3,17 +3,23 @@
 import 'dart:developer';
 
 import 'package:entry/entry.dart';
+import 'package:faboules/core/langs.dart';
 import 'package:faboules/uniModel.dart';
 import 'package:faboules/widget/blur_image.dart';
 import 'package:faboules/widget/color_viewer.dart';
+import 'package:faboules/widget/language_carousel.dart';
 import 'package:faboules/widget/spotify_button.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive/hive.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:spotify/spotify.dart' as s;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'lyrics_services.dart';
 
@@ -29,6 +35,8 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
   Color? darkMutedColor = Colors.grey[900];
   Color? vibrantColor = Colors.grey[900];
   Color? darkVibrantColor = Colors.grey[900];
+  bool isLoading = true;
+  final fieldNode = FocusNode();
 
   Set<int> _selectedLineIndices = Set();
 
@@ -45,6 +53,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
 
     double width = MediaQuery.of(context).size.width;
     double height = MediaQuery.of(context).size.height;
+    print('imageUrl: ${imageUrl}');
 
     return Scaffold(
       backgroundColor: vibrantColor,
@@ -70,81 +79,10 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
 
             const SizedBox(height: 30),
 
-            // if (kDebugMode)Text(uniModel.clipboard ?? '', style: TextStyle(color: Colors.white),),
-            if (imageUrl != null)
-              buildFaboulesLyrics(imageUrl, width, uniModel, _controller),
+            imageUrl == null
+                ? buildHomePage(width, _controller)
+                : buildMediaLyrics(imageUrl, width, uniModel, _controller),
 
-            // buildMainSearch(),
-
-            // On init
-            if (imageUrl == null) ...[
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: width * 0.05),
-                child: ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(10), // Apply border radius here
-                  child: Container(
-                    height: width * 0.9,
-                    color: Colors.white10,
-                    child: Center(
-                      child: Icon(
-                        Icons.album,
-                        color: Colors.white.withOpacity(0.25),
-                        size: width * 0.4,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Container(
-                height: 60,
-                margin: EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                        color: Colors.white, width: 3), // White border
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                          99), // Optional: rounded corners
-                    ),
-                  ),
-                  onPressed: () async {
-                    await getSong();
-                    getLyrics(_controller.text);
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Text(
-                      //   'Faboules',
-                      //   style: TextStyle(color: Colors.white, fontSize: 14),
-                      // ),
-                      // SizedBox(width: 8), // Spacing between icon and text
-                      Icon(
-                        Icons.music_note,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  'קבלו תרגום לכל שיר, פשוט'
-                  '\n'
-                  'העתיקו את הקישור מ Spotify והפעילו',
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
-                ),
-              )
-            ],
-
-            const SizedBox(height: 20),
-            buildLyricsCards(),
-            const SizedBox(height: 40),
             // Space below the ListView
           ],
         ),
@@ -152,7 +90,172 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     );
   }
 
-  Entry buildFaboulesLyrics(String? imageUrl, double width, UniModel uniModel,
+  Widget buildHomePage(double width, TextEditingController _controller) {
+    var box = Hive.box('myBox');
+    var cacheLang = box.get('selectedLang');
+
+    Map<String, String>? selectedLang =
+        languages.firstWhere((j) => j['name'] == (cacheLang ?? 'Hebrew'));
+
+    return StatefulBuilder(builder: (context, setState) {
+      return Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: width * 0.05),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              // Apply border radius here
+              child: Container(
+                height: width * 0.9,
+                // color: Colors.white10,
+                color: Colors.grey[800],
+                child: Center(
+                  child: Icon(
+                    Icons.album,
+                    color: Colors.white.withOpacity(0.25),
+                    size: width * 0.4,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 15),
+          Transform.translate(
+            offset: Offset(0, -55),
+            child: Column(
+              children: [
+                LanguageCarousel(
+                  onLanguageSelected: (int index) {
+                    selectedLang = languages[index];
+
+                    setState(() {});
+                  },
+                ),
+                Container(
+                  height: 60,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: buildSubText(
+                      selectedLang!['subText'].toString(),
+                    ),
+
+                    // Text(
+                    //   selectedLang!['subText'].toString(),
+                    //   textDirection: TextDirection.rtl,
+                    //   textAlign: TextAlign.center,
+                    //   style: TextStyle(color: Colors.white70, fontSize: 18),
+                    // ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  // height: 60,
+                  margin: const EdgeInsets.only(
+                      left: 20, right: 20, top: 5, bottom: 15),
+                  child: SizedBox(
+                    width: 100,
+                    height: 70,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        side: BorderSide(color: Colors.grey[700]!, width: 4),
+                        // White border
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                              15), // Optional: rounded corners
+                        ),
+                      ),
+                      onPressed: () async {
+                        await getSong();
+                        getLyricsOnly(_controller.text);
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Text(
+                          //   'Faboules',
+                          //   style: TextStyle(color: Colors.white, fontSize: 14),
+                          // ),
+                          // SizedBox(width: 8), // Spacing between icon and text
+
+                          Image.asset('assets/logo_ios_transp.png', height: 50),
+
+                          // Icon(
+                          //   Icons.music_note,
+                          //   color: Colors.white,
+                          //   size: 24,
+                          // ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        ],
+      );
+    });
+  }
+
+  Widget buildSubText(String data) {
+    void launchSpotify() async {
+      await launchUrl(Uri.parse('spotify://'));
+    }
+
+    List<TextSpan> _getRichTextSpans(String text) {
+      List<TextSpan> spans = [];
+      RegExp exp = RegExp(r"(Spotify)");
+      Iterable<RegExpMatch> matches = exp.allMatches(text);
+
+      int lastMatchEnd = 0;
+      for (var match in matches) {
+        // Add text before the match
+        if (match.start > lastMatchEnd) {
+          spans.add(TextSpan(
+            text: text.substring(lastMatchEnd, match.start),
+          ));
+        }
+
+        // Add "Spotify" with custom style and link functionality
+        spans.add(TextSpan(
+          text: 'Spotify',
+          style: const TextStyle(
+            // color: Colors.blue,
+            color: Colors.white70,
+            fontSize: 18,
+            // fontWeight: FontWeight.bold,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              // Open Spotify link
+              launchSpotify();
+            },
+        ));
+
+        lastMatchEnd = match.end;
+      }
+
+      // Add any remaining text after the last match
+      if (lastMatchEnd < text.length) {
+        spans.add(TextSpan(text: text.substring(lastMatchEnd)));
+      }
+
+      return spans;
+    }
+
+    return RichText(
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        children: _getRichTextSpans(data),
+        style: TextStyle(color: Colors.white70, fontSize: 18), // Default style
+      ),
+    );
+  }
+
+  Entry buildMediaLyrics(String? imageUrl, double width, UniModel uniModel,
       TextEditingController _controller) {
     return Entry.opacity(
       duration: const Duration(milliseconds: 600),
@@ -167,7 +270,8 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
         // mainAxisAlignment: MainAxisAlignment.center,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(10), // Apply border radius here
+            borderRadius: BorderRadius.circular(10),
+            // Apply border radius here
             child: FadeInImage.assetNetwork(
               fadeInDuration: const Duration(milliseconds: 200),
               placeholder: '',
@@ -201,6 +305,9 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                       Container(
                         width: width * 0.6,
                         child: TextField(
+                          onSubmitted: (value) =>
+                              getLyricsOnly(_controller.text),
+                          focusNode: fieldNode,
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -218,13 +325,48 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                     ],
                   ),
                   const Spacer(),
-                  IconButton(
-                    // icon: Icon(
-                    //   Icons.play_circle_outline,
+                  InkWell(
+                    // child: Icon(
+                    //   // Icons.play_circle_outline,
+                    //   Icons.music_note_sharp,
                     //   color: Colors.white,
                     //   size: 36,
                     // ),
-                    icon: ColorFiltered(
+
+                    // child: Image.asset(
+                    //   'assets/logo_ios_transp.png',
+                    //   height: 45,
+                    // ),
+
+                    // child: Container(
+                    //   width: 32, // Adjust the size as needed
+                    //   height: 32,
+                    //   decoration: BoxDecoration(
+                    //     shape: BoxShape.circle,
+                    //     border: Border.all(
+                    //       color: Colors.white, // Border color
+                    //       width: 2, // Border thickness
+                    //     ),
+                    //   ),
+                    //   child: CircleAvatar(
+                    //     backgroundColor: Colors.transparent,
+                    //     child: Transform.translate(
+                    //       offset: Offset(0.0, 0.0),
+                    //       child: ColorFiltered(
+                    //         colorFilter: ColorFilter.mode(
+                    //           Colors.white,
+                    //           BlendMode.srcIn,
+                    //         ),
+                    //         child: Image.asset(
+                    //           'assets/logo_ios_note.png',
+                    //           height: 20,
+                    //         ),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+
+                    child: ColorFiltered(
                       colorFilter: ColorFilter.mode(
                         Colors.white,
                         BlendMode.srcIn,
@@ -234,38 +376,49 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
                         height: 32,
                       ),
                     ),
-                    onPressed: () async {
+                    onTap: () async {
                       await getSong();
-                      getLyrics(_controller.text);
+                      getLyricsOnly(_controller.text);
                     },
                   ),
+                  const SizedBox(width: 10),
                   InkWell(
                       child: Icon(
-                        Icons.downloading,
+                        fieldNode.hasFocus
+                            ? Icons.check_circle_outline_outlined
+                            : Icons.downloading,
+                        // Icons.translate_rounded,
                         color: Colors.white,
                         size: 36,
                       ),
-                      onTap: () async => getLyrics(_controller.text),
+                      onTap: () async => fieldNode.hasFocus
+                          ? getLyricsOnly(_controller.text)
+                          : fieldNode.requestFocus(),
                       onLongPress: () {
                         // Extract track name and remove everything after "-" or "("
                         final txt = (uniModel.track?.name.toString() ?? '');
                         final cleanedTxt =
                             txt.split(RegExp(r'\s*[-(].*')).first.trim();
-                        getLyrics(cleanedTxt);
+                        getLyricsOnly(cleanedTxt);
                       }),
                 ],
               ),
             ),
-          )
+          ),
+          const SizedBox(height: 20),
+          buildLyricsCards(isLoading),
+          const SizedBox(height: 40),
         ],
       )),
     );
   }
 
-  Future getLyrics(String query) async {
+  Future getLyricsOnly(String query) async {
+    isLoading = true;
     lyrics = [];
     translatedLines = [];
     _selectedLineIndices = Set();
+    fieldNode.unfocus();
     setState(() {});
 
     final songPath = await LyricsServices.getSongPath(q: query);
@@ -275,6 +428,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     translatedLines = await LyricsServices.translatedLyrics(lyrics)
         .then((result) => LyricsServices.cleanLyrics(result));
 
+    isLoading = false;
     setState(() {});
   }
 
@@ -282,6 +436,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     lyrics = [];
     translatedLines = [];
     _selectedLineIndices = Set();
+    isLoading = true;
     setState(() {});
 
     await context.read<UniModel>().setTrackFromClipboard();
@@ -304,69 +459,78 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
     setState(() {});
   }
 
-  Widget buildLyricsCards() {
+  Widget buildLyricsCards(bool isLoading) {
     return ListView.builder(
       shrinkWrap: true,
       physics: const BouncingScrollPhysics(),
-      itemCount: lyrics.length,
+      itemCount: isLoading ? 10 : lyrics.length,
       itemBuilder: (context, index) {
+        if (isLoading) {
+          lyrics = List<String>.filled(20, 'Well, U find my Easter Egg!');
+          translatedLines = lyrics;
+        }
+
         final isHebrewText = _isHebrew(lyrics[index]);
         final isHebrewTranslatedText = _isHebrew(translatedLines[index]);
 
-        return Entry.opacity(
-          duration: const Duration(milliseconds: 600),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            child: Card(
-              margin: EdgeInsets.zero,
-              elevation: 10,
-              // color: Colors.white.withOpacity(0.1),
-              color: vibrantColor?.withOpacity(0.90),
-              // color: darkVibrantColor,
-              // color: darkMutedColor,
-              child: ListTile(
-                splashColor: Colors.transparent,
-                title: Text(
-                  lyrics[index],
-                  style: const TextStyle(color: Colors.white),
-                  textAlign: isHebrewText ? TextAlign.right : TextAlign.left,
-                ),
-                subtitle: _selectedLineIndices.contains(index)
-                    ? Directionality(
-                        textDirection: isHebrewText
-                            ? TextDirection.rtl
-                            : TextDirection.ltr,
-                        child: Text(
-                          textAlign: isHebrewTranslatedText
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          translatedLines.isNotEmpty &&
-                                  index < translatedLines.length
-                              ? translatedLines[index]
-                              : '',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.70),
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      )
-                    : null,
-                onTap: () {
-                  if (_selectedLineIndices.contains(index)) {
-                    _selectedLineIndices.remove(index);
-                  } else {
-                    _selectedLineIndices.add(index);
-                  }
-                  setState(() {});
-                },
+        final content = Container(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Card(
+            margin: EdgeInsets.zero,
+            elevation: isLoading ? 0 : 10,
+            color: vibrantColor?.withOpacity(0.90),
+            child: ListTile(
+              splashColor: Colors.transparent,
+              title: Text(
+                lyrics[index],
+                style: const TextStyle(color: Colors.white),
+                textAlign: isHebrewText ? TextAlign.right : TextAlign.left,
               ),
+              subtitle: _selectedLineIndices.contains(index)
+                  ? Directionality(
+                      textDirection:
+                          isHebrewText ? TextDirection.rtl : TextDirection.ltr,
+                      child: Text(
+                        textAlign: isHebrewTranslatedText
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        translatedLines.isNotEmpty &&
+                                index < translatedLines.length
+                            ? translatedLines[index]
+                            : '',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.70),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                if (_selectedLineIndices.contains(index)) {
+                  _selectedLineIndices.remove(index);
+                } else {
+                  _selectedLineIndices.add(index);
+                }
+                setState(() {});
+              },
             ),
           ),
+        );
+
+        return Entry.opacity(
+          duration: const Duration(milliseconds: 400),
+          child: isLoading
+              ? Shimmer.fromColors(
+                  baseColor: Colors.black12,
+                  highlightColor: Colors.black38,
+                  child: content,
+                )
+              : content,
         );
       },
     );
@@ -452,7 +616,7 @@ class _LyricsTranslatorState extends State<LyricsTranslator> {
             flex: 40,
           ),
           Text(
-            'Faboules',
+            'Trance',
             style: GoogleFonts.rubik(
               color: Colors.white,
               fontSize: 14,

@@ -2,11 +2,14 @@ import 'dart:developer';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:translator/translator.dart';
+
+import 'core/langs.dart';
 
 class LyricsServices {
   static Future<String?> getSongPath({required String q}) async {
@@ -77,7 +80,13 @@ class LyricsServices {
 
   static Future<List<String>> translatedLyrics(List<String> lyrics) async {
     final translator = GoogleTranslator();
-    const targetLanguage = 'he'; // Hebrew
+
+    var box = Hive.box('myBox');
+    var cacheLang = box.get('selectedLang');
+
+    Map<String, String>? selectedLang =
+        languages.firstWhere((j) => j['name'] == (cacheLang ?? 'Hebrew'));
+    final targetLanguage = selectedLang['code'].toString(); // Hebrew
 
     List<String> translatedLines = [];
 
